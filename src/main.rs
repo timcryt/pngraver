@@ -4,6 +4,8 @@ use std::{
     str::FromStr,
 };
 
+use rayon::prelude::*;
+
 #[macro_use]
 extern crate structopt;
 pub struct Matrix<T> {
@@ -201,13 +203,7 @@ fn read_img(inpfile: &str) -> Matrix<(u8, u8, u8)> {
 }
 
 fn make_diff(img: Matrix<(u8, u8, u8)>, conf: Config) -> Matrix<(u8, u8, u8)> {
-    let mut res = Matrix::new(
-        vec![(0, 0, 0); (img.width() - 2) * (img.height() - 2)],
-        img.width() - 2,
-        img.height() - 2,
-    );
-
-    let r = [
+    let r: [(i32, i32); 9] = [
         (-1, -1),
         (-1, 0),
         (-1, 1),
@@ -236,48 +232,55 @@ fn make_diff(img: Matrix<(u8, u8, u8)>, conf: Config) -> Matrix<(u8, u8, u8)> {
         })
         .collect::<Vec<_>>();
 
-    for x in 1..(img.height() - 1) {
-        for y in 1..(img.width() - 1) {
-            res[x - 1][y - 1] = {
-                let mut s = (0.0, 0.0, 0.0);
-                for (m, dx, dy) in &r {
-                    s.0 += *m
-                        * img[x.overflowing_add(*dx as usize).0][y.overflowing_add(*dy as usize).0]
-                            .0 as f64;
-                    s.1 += *m
-                        * img[x.overflowing_add(*dx as usize).0][y.overflowing_add(*dy as usize).0]
-                            .1 as f64;
-                    s.2 += *m
-                        * img[x.overflowing_add(*dx as usize).0][y.overflowing_add(*dy as usize).0]
-                            .2 as f64;
-                }
-                let ms: f64 = r.iter().map(|(m, _, _)| m).sum();
-                s.0 /= ms;
-                s.1 /= ms;
-                s.2 /= ms;
-                s.0 -= img[x][y].0 as f64;
-                s.1 -= img[x][y].1 as f64;
-                s.2 -= img[x][y].2 as f64;
-                s.0 = if conf.inv {
-                    255.0 + s.0 * conf.mult - conf.add
-                } else {
-                    -s.0 * conf.mult + conf.add
-                };
-                s.1 = if conf.inv {
-                    255.0 + s.1 * conf.mult - conf.add
-                } else {
-                    -s.1 * conf.mult + conf.add
-                };
-                s.2 = if conf.inv {
-                    255.0 + s.2 * conf.mult - conf.add
-                } else {
-                    -s.2 * conf.mult + conf.add
-                };
-                (s.0.round() as u8, s.1.round() as u8, s.2.round() as u8)
-            };
-        }
-    }
-    res
+    let v = (1..(img.height() - 1))
+        .into_par_iter()
+        .flat_map(|x| {
+            (1..(img.width() - 1))
+                .map(|y| {
+                    let mut s = (0.0, 0.0, 0.0);
+                    for (m, dx, dy) in &r {
+                        s.0 += *m
+                            * img[x.overflowing_add(*dx as usize).0]
+                                [y.overflowing_add(*dy as usize).0]
+                                .0 as f64;
+                        s.1 += *m
+                            * img[x.overflowing_add(*dx as usize).0]
+                                [y.overflowing_add(*dy as usize).0]
+                                .1 as f64;
+                        s.2 += *m
+                            * img[x.overflowing_add(*dx as usize).0]
+                                [y.overflowing_add(*dy as usize).0]
+                                .2 as f64;
+                    }
+                    let ms: f64 = r.iter().map(|(m, _, _)| m).sum();
+                    s.0 /= ms;
+                    s.1 /= ms;
+                    s.2 /= ms;
+                    s.0 -= img[x][y].0 as f64;
+                    s.1 -= img[x][y].1 as f64;
+                    s.2 -= img[x][y].2 as f64;
+                    s.0 = if conf.inv {
+                        255.0 + s.0 * conf.mult - conf.add
+                    } else {
+                        -s.0 * conf.mult + conf.add
+                    };
+                    s.1 = if conf.inv {
+                        255.0 + s.1 * conf.mult - conf.add
+                    } else {
+                        -s.1 * conf.mult + conf.add
+                    };
+                    s.2 = if conf.inv {
+                        255.0 + s.2 * conf.mult - conf.add
+                    } else {
+                        -s.2 * conf.mult + conf.add
+                    };
+                    (s.0.round() as u8, s.1.round() as u8, s.2.round() as u8)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+
+    Matrix::new(v, img.width() - 2, img.height() - 2)
 }
 
 fn save_diff(outfile: &str, img: Matrix<(u8, u8, u8)>) {

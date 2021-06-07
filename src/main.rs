@@ -114,11 +114,26 @@ struct Config {
     infile: String,
     #[structopt(help = "Выходной файл картинки в формате PNG")]
     outfile: String,
-    #[structopt(help = "Расстояния до соседей", short = "n", long = "heiboors", default_value = "121202121")]
+    #[structopt(
+        help = "Расстояния до соседей",
+        short = "n",
+        long = "heiboors",
+        default_value = "121202121"
+    )]
     neiboors: Neighboors,
-    #[structopt(help = "Яркость (от 0 до 255)", short = "a", long = "add", default_value = "127.0")]
+    #[structopt(
+        help = "Яркость (от 0 до 255)",
+        short = "a",
+        long = "add",
+        default_value = "127.0"
+    )]
     add: f64,
-    #[structopt(help = "Множитель контрастности", short = "m", long = "mult", default_value = "0.5")]
+    #[structopt(
+        help = "Множитель контрастности",
+        short = "m",
+        long = "mult",
+        default_value = "0.5"
+    )]
     mult: f64,
     #[structopt(help = "Инвертировать цвета", short = "i", long = "invert")]
     inv: bool,
@@ -143,18 +158,39 @@ fn read_img(inpfile: &str) -> Matrix<(u8, u8, u8)> {
         )
     });
 
-    if reader.info().bit_depth != png::BitDepth::Eight
-        || reader.info().color_type != png::ColorType::RGB
+    let buf = if reader.info().bit_depth == png::BitDepth::Eight
+        && reader.info().color_type == png::ColorType::RGB
     {
-        panic!("Неверный цветовой формат файла {:?}\nПрограмма не поддерживает прозрачность и ЧБ изображения", inpfile)
-    }
-
-    let buf = {
         let mut new_buf = Vec::new();
         for i in 0..(buf.len() / 3) {
             new_buf.push((buf[3 * i], buf[3 * i + 1], buf[3 * i + 2]));
         }
         new_buf
+    } else if reader.info().bit_depth == png::BitDepth::Eight
+        && reader.info().color_type == png::ColorType::Grayscale
+    {
+        let mut new_buf = Vec::new();
+        for i in 0..(buf.len()) {
+            new_buf.push((buf[i], buf[i], buf[i]));
+        }
+        new_buf
+    } else if reader.info().palette.is_some()
+        && reader.info().bits_per_pixel() == 8
+        && reader.info().bit_depth == png::BitDepth::Eight
+        && reader.info().color_type == png::ColorType::RGB
+    {
+        let palette = reader.info().palette.as_ref().unwrap();
+        let mut new_buf = Vec::new();
+        for i in 0..(buf.len()) {
+            new_buf.push((
+                palette[buf[i] as usize * 3],
+                palette[buf[i] as usize * 3 + 1],
+                palette[buf[i] as usize * 3 + 2],
+            ));
+        }
+        new_buf
+    } else {
+        panic!("Неверный цветовой формат файла {:?}.", inpfile)
     };
 
     Matrix::new(
@@ -253,7 +289,9 @@ fn save_diff(outfile: &str, img: Matrix<(u8, u8, u8)>) {
     );
     encoder.set_color(png::ColorType::RGB);
     encoder.set_depth(png::BitDepth::Eight);
-    let mut writer = encoder.write_header().unwrap_or_else(|_| panic!("Ошибка записи в файл {:?}", outfile));
+    let mut writer = encoder
+        .write_header()
+        .unwrap_or_else(|_| panic!("Ошибка записи в файл {:?}", outfile));
     let buf = {
         let mut buf = Vec::new();
         for i in 0..img.height() {
@@ -265,7 +303,9 @@ fn save_diff(outfile: &str, img: Matrix<(u8, u8, u8)>) {
         }
         buf
     };
-    writer.write_image_data(&buf).unwrap_or_else(|_| panic!("Ошибка записи в файл {:?}", outfile));
+    writer
+        .write_image_data(&buf)
+        .unwrap_or_else(|_| panic!("Ошибка записи в файл {:?}", outfile));
 }
 
 fn main() {

@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use png::{BitDepth, ColorType};
 use rayon::prelude::*;
 
 #[macro_use]
@@ -160,29 +161,29 @@ fn read_img(inpfile: &str) -> Matrix<(u8, u8, u8)> {
         )
     });
 
-    let buf = if reader.info().bit_depth == png::BitDepth::Eight
-        && reader.info().color_type == png::ColorType::RGB
-    {
-        let mut new_buf = Vec::new();
+    let mut new_buf = Vec::new();
+    let info = reader.info();
+    let buf = if info.bit_depth == BitDepth::Eight && info.color_type == ColorType::RGB {
         for i in 0..(buf.len() / 3) {
             new_buf.push((buf[3 * i], buf[3 * i + 1], buf[3 * i + 2]));
         }
         new_buf
-    } else if reader.info().bit_depth == png::BitDepth::Eight
-        && reader.info().color_type == png::ColorType::Grayscale
-    {
-        let mut new_buf = Vec::new();
+    } else if info.bit_depth == BitDepth::Eight && info.color_type == ColorType::RGBA {
+        for i in 0..(buf.len() / 4) {
+            new_buf.push((buf[4 * i], buf[4 * i + 1], buf[4 * i + 2]));
+        }
+        new_buf
+    } else if info.bit_depth == BitDepth::Eight && info.color_type == ColorType::Grayscale {
         for i in 0..(buf.len()) {
             new_buf.push((buf[i], buf[i], buf[i]));
         }
         new_buf
-    } else if reader.info().palette.is_some()
-        && reader.info().bits_per_pixel() == 8
-        && reader.info().bit_depth == png::BitDepth::Eight
-        && reader.info().color_type == png::ColorType::RGB
+    } else if info.palette.is_some()
+        && info.bits_per_pixel() == 8
+        && info.bit_depth == BitDepth::Eight
+        && info.color_type == ColorType::RGB
     {
-        let palette = reader.info().palette.as_ref().unwrap();
-        let mut new_buf = Vec::new();
+        let palette = info.palette.as_ref().unwrap();
         for i in 0..(buf.len()) {
             new_buf.push((
                 palette[buf[i] as usize * 3],
@@ -288,8 +289,8 @@ fn save_diff(outfile: &str, img: Matrix<(u8, u8, u8)>) {
         img.width() as u32,
         img.height() as u32,
     );
-    encoder.set_color(png::ColorType::RGB);
-    encoder.set_depth(png::BitDepth::Eight);
+    encoder.set_color(ColorType::RGB);
+    encoder.set_depth(BitDepth::Eight);
     let mut writer = encoder
         .write_header()
         .unwrap_or_else(|_| panic!("Ошибка записи в файл {:?}", outfile));

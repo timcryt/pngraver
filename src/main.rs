@@ -232,30 +232,28 @@ fn make_diff(img: Matrix<(u8, u8, u8)>, conf: Config) -> Matrix<(u8, u8, u8)> {
         })
         .collect::<Vec<_>>();
 
-    let v = (1..(img.height() - 1))
+    let v = (0..img.height())
         .into_par_iter()
         .flat_map(|x| {
-            (1..(img.width() - 1))
+            (0..img.width())
                 .map(|y| {
                     let mut s = (0.0, 0.0, 0.0);
+                    let mut ms = 0.0;
                     for (m, dx, dy) in &r {
-                        s.0 += *m
-                            * img[x.overflowing_add(*dx as usize).0]
-                                [y.overflowing_add(*dy as usize).0]
-                                .0 as f64;
-                        s.1 += *m
-                            * img[x.overflowing_add(*dx as usize).0]
-                                [y.overflowing_add(*dy as usize).0]
-                                .1 as f64;
-                        s.2 += *m
-                            * img[x.overflowing_add(*dx as usize).0]
-                                [y.overflowing_add(*dy as usize).0]
-                                .2 as f64;
+                        let mx = x.overflowing_add(*dx as usize).0;
+                        let my = y.overflowing_add(*dy as usize).0;
+                        if mx < img.height() && my < img.width() {
+                            s.0 += *m * img[mx][my].0 as f64;
+                            s.1 += *m * img[mx][my].1 as f64;
+                            s.2 += *m * img[mx][my].2 as f64;
+                            ms += *m;
+                        }
                     }
-                    let ms: f64 = r.iter().map(|(m, _, _)| m).sum();
-                    s.0 /= ms;
-                    s.1 /= ms;
-                    s.2 /= ms;
+                    if ms != 0.0 {
+                        s.0 /= ms;
+                        s.1 /= ms;
+                        s.2 /= ms;
+                    }
                     s.0 -= img[x][y].0 as f64;
                     s.1 -= img[x][y].1 as f64;
                     s.2 -= img[x][y].2 as f64;
@@ -280,7 +278,7 @@ fn make_diff(img: Matrix<(u8, u8, u8)>, conf: Config) -> Matrix<(u8, u8, u8)> {
         })
         .collect::<Vec<_>>();
 
-    Matrix::new(v, img.width() - 2, img.height() - 2)
+    Matrix::new(v, img.width(), img.height())
 }
 
 fn save_diff(outfile: &str, img: Matrix<(u8, u8, u8)>) {

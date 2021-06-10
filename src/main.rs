@@ -260,21 +260,14 @@ fn make_diff(img: Matrix<(u8, u8, u8)>, conf: Config) -> Matrix<(u8, u8, u8)> {
                     s.0 -= img[x][y].0 as f64;
                     s.1 -= img[x][y].1 as f64;
                     s.2 -= img[x][y].2 as f64;
-                    s.0 = if conf.inv {
-                        255.0 + s.0 * conf.mult - conf.add
-                    } else {
-                        -s.0 * conf.mult + conf.add
-                    };
-                    s.1 = if conf.inv {
-                        255.0 + s.1 * conf.mult - conf.add
-                    } else {
-                        -s.1 * conf.mult + conf.add
-                    };
-                    s.2 = if conf.inv {
-                        255.0 + s.2 * conf.mult - conf.add
-                    } else {
-                        -s.2 * conf.mult + conf.add
-                    };
+                    s.0 = -s.0 * conf.mult + conf.add;
+                    s.1 = -s.1 * conf.mult + conf.add;
+                    s.2 = -s.2 * conf.mult + conf.add;
+                    if conf.inv {
+                        s.0 = 255.0 - s.0;
+                        s.1 = 255.0 - s.1;
+                        s.2 = 255.0 - s.2;
+                    }
                     if conf.gray {
                         let s = (
                             s.0.round() as u64 as f64,

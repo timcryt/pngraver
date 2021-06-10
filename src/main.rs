@@ -120,7 +120,7 @@ struct Config {
     #[structopt(
         help = "Расстояния до соседей",
         short = "n",
-        long = "heiboors",
+        long = "neiboors",
         default_value = "121202121"
     )]
     neiboors: Neighboors,
@@ -140,6 +140,8 @@ struct Config {
     mult: f64,
     #[structopt(help = "Инвертировать цвета", short = "i", long = "invert")]
     inv: bool,
+    #[structopt(help = "Убрать цвета", short = "g", long = "gray")]
+    gray: bool,
 }
 
 fn read_img(inpfile: &str) -> Matrix<(u8, u8, u8)> {
@@ -174,8 +176,8 @@ fn read_img(inpfile: &str) -> Matrix<(u8, u8, u8)> {
         }
         new_buf
     } else if info.bit_depth == BitDepth::Eight && info.color_type == ColorType::Grayscale {
-        for i in 0..(buf.len()) {
-            new_buf.push((buf[i], buf[i], buf[i]));
+        for el in &buf {
+            new_buf.push((*el, *el, *el));
         }
         new_buf
     } else if info.palette.is_some()
@@ -273,7 +275,18 @@ fn make_diff(img: Matrix<(u8, u8, u8)>, conf: Config) -> Matrix<(u8, u8, u8)> {
                     } else {
                         -s.2 * conf.mult + conf.add
                     };
-                    (s.0.round() as u8, s.1.round() as u8, s.2.round() as u8)
+                    if conf.gray {
+                        let s = (
+                            s.0.round() as u64 as f64,
+                            s.1.round() as u64 as f64,
+                            s.2.round() as u64 as f64 / 2.0,
+                        );
+                        let abs = (s.0.powi(2) + s.1.powi(2) + s.2.powi(2)).sqrt();
+                        let bright = (abs.round() / 1.5) as u8;
+                        (bright, bright, bright)
+                    } else {
+                        (s.0.round() as u8, s.1.round() as u8, s.2.round() as u8)
+                    }
                 })
                 .collect::<Vec<_>>()
         })

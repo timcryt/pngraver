@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width; initial-scale=1.0" />
+    <script type="text/javascript">
+        function downloadAsFile(data) {
+            let a = document.getElementById("img");
+            let file = new Blob([data], { type: 'image/png' });
+            a.src = URL.createObjectURL(file);
+        }
+
+        function getNeighboors() {
+            let res = ''
+            for (let i = 1; i <= 9; i++) {
+                let a = document.getElementById('n' + i);
+                if (a.checked) {
+                    res = res + '1'
+                } else {
+                    res = res + '0'
+                }
+            }
+            return res;
+        }
+
+        function send() {
+            let file = document.getElementById('input').files[0];
+            let reader = new FileReader();
+            reader.onloadend = () => {
+                let arr = reader.result;
+                let t = new Uint8Array(arr);
+                let content = btoa(String.fromCharCode(...t));
+                let xhr = new XMLHttpRequest();
+                xhr.open('POST', '/', true);
+                xhr.responseType = 'blob'
+                xhr.onreadystatechange = function () {
+                    if (this.readyState != 4) return;
+                    let reader = new FileReader();
+                    reader.onloadend = () => {
+                        downloadAsFile(reader.result)
+                    };
+                    downloadAsFile(this.response);
+                }
+
+                xhr.send(JSON.stringify({
+                    file: [file.name, content],
+                    neighboors: getNeighboors(),
+                    add: document.getElementById('add').value - 0,
+                    mult: document.getElementById('mult').value - 0,
+                    inv: document.getElementById('inv').checked,
+                    gray: document.getElementById('gray').checked
+                }));
+
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</head>
+
+<body>
+
+    <table>
+        <tbody>
+            <tr>
+                <td>Файл изображения:</td>
+                <td><input type="file" id="input" accept="image/*" onchange="send()" /></td>
+            </tr>
+            <tr>
+                <td>Яркость:</td>
+                <td><input type="numer" id="add" min="0.0" max="255.0" value="127.0" onchange="send()" /></td>
+            </tr>
+            <tr>
+                <td>Контрастность:</td>
+                <td><input type="numer" id="mult" min="0.0" value="0.5" onchange="send()" /></td>
+            </tr>
+            <tr>
+                <td>Соседи</td>
+                <td>
+                    <input type="checkbox" id="n1" onchange="send()" />
+                    <input type="checkbox" id="n2" onchange="send()" />
+                    <input type="checkbox" id="n3" onchange="send()" />
+                    <br />
+                    <input type="checkbox" id="n4" onchange="send()" />
+                    <input type="checkbox" id="n5" onchange="send()" />
+                    <input type="checkbox" id="n6" onchange="send()" />
+                    <br />
+                    <input type="checkbox" id="n7" onchange="send()" />
+                    <input type="checkbox" id="n8" onchange="send()" />
+                    <input type="checkbox" id="n9" onchange="send()" />
+                    <br />
+                </td>
+            </tr>
+            <tr>
+                <td>Инвертировать цвета:</td>
+                <td><input type="checkbox" id="inv" onchange="send()" /></td>
+            </tr>
+            <tr>
+                <td>Оттенки серого:</td>
+                <td><input type="checkbox" id="gray" checked onchange="send()" /></td>
+            </tr>
+        </tbody>
+    </table>
+    <input type="button" id="grave" value="Сделать гравюру" onclick="send()" />
+    <p></p>
+    <img id="img" style="max-height: 667px" />
+</body>
+
+</html>

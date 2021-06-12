@@ -1,0 +1,13 @@
+[package]
+name = "pngraver-web"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+pngraver-core = { path = "../pngraver-core" }
+base64 = "0.13"
+image = "0.23"
+rouille = "3"
+serde = "1"
+serde_derive = "1"
+serde_json = "1"

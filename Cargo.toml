@@ -1,15 +1,6 @@
-[package]
-name = "pngraver"
-version = "0.2.0"
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-image = "0.23"
-structopt = "0.3"
-rayon = "1"
-
-[lib]
-name = "pngraver"
-path = "src/lib.rs"
+[workspace]
+members = [
+    "pngraver-core",
+    "pngraver-cli",
+    "pngraver-web",
+]

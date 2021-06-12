@@ -4,7 +4,6 @@ use std::{
     str::FromStr,
 };
 
-use png::{BitDepth, ColorType};
 use rayon::prelude::*;
 
 #[macro_use]
@@ -23,6 +22,10 @@ impl<T> Matrix<T> {
             width,
             height,
         }
+    }
+
+    pub fn as_slice(&self) -> &[T] {
+        &self.data[..]
     }
 
     pub fn width(&self) -> usize {
@@ -145,64 +148,22 @@ struct Config {
 }
 
 fn read_img(inpfile: &str) -> Matrix<(u8, u8, u8)> {
-    let decoder = png::Decoder::new(
-        std::fs::File::open(inpfile)
-            .unwrap_or_else(|_| panic!("Не удалось открыть файл {:?}", inpfile)),
-    );
-    let (info, mut reader) = decoder.read_info().unwrap_or_else(|_| {
-        panic!(
-            "Ошибка чтения файла (возможно файл имеет неверный формат) {:?}",
-            inpfile
-        )
-    });
-    let mut buf = vec![0; info.buffer_size()];
-    reader.next_frame(&mut buf).unwrap_or_else(|_| {
-        panic!(
-            "Ошибка чтения файла (возможно файл имеет неверный формат) {:?}",
-            inpfile
-        )
-    });
+    let decoder = image::open(inpfile)
+        .unwrap_or_else(|e| panic!("Не удалось открыть файл.\nПричина: '{}'", e))
+        .to_rgb8();
 
-    let mut new_buf = Vec::new();
-    let info = reader.info();
-    let buf = if info.bit_depth == BitDepth::Eight && info.color_type == ColorType::RGB {
-        for i in 0..(buf.len() / 3) {
-            new_buf.push((buf[3 * i], buf[3 * i + 1], buf[3 * i + 2]));
+    let (w, h) = decoder.dimensions();
+
+    let buf = {
+        let mut buf = Vec::new();
+        let t = decoder.to_vec();
+        for i in 0..(decoder.len() / 3) {
+            buf.push((t[i * 3], t[i * 3 + 1], t[i * 3 + 2]));
         }
-        new_buf
-    } else if info.bit_depth == BitDepth::Eight && info.color_type == ColorType::RGBA {
-        for i in 0..(buf.len() / 4) {
-            new_buf.push((buf[4 * i], buf[4 * i + 1], buf[4 * i + 2]));
-        }
-        new_buf
-    } else if info.bit_depth == BitDepth::Eight && info.color_type == ColorType::Grayscale {
-        for el in &buf {
-            new_buf.push((*el, *el, *el));
-        }
-        new_buf
-    } else if info.palette.is_some()
-        && info.bits_per_pixel() == 8
-        && info.bit_depth == BitDepth::Eight
-        && info.color_type == ColorType::RGB
-    {
-        let palette = info.palette.as_ref().unwrap();
-        for i in 0..(buf.len()) {
-            new_buf.push((
-                palette[buf[i] as usize * 3],
-                palette[buf[i] as usize * 3 + 1],
-                palette[buf[i] as usize * 3 + 2],
-            ));
-        }
-        new_buf
-    } else {
-        panic!("Неверный цветовой формат файла {:?}.", inpfile)
+        buf
     };
 
-    Matrix::new(
-        buf,
-        reader.info().width as usize,
-        reader.info().height as usize,
-    )
+    Matrix::new(buf, w as usize, h as usize)
 }
 
 fn make_diff(img: Matrix<(u8, u8, u8)>, conf: Config) -> Matrix<(u8, u8, u8)> {
@@ -289,31 +250,17 @@ fn make_diff(img: Matrix<(u8, u8, u8)>, conf: Config) -> Matrix<(u8, u8, u8)> {
 }
 
 fn save_diff(outfile: &str, img: Matrix<(u8, u8, u8)>) {
-    let mut encoder = png::Encoder::new(
-        std::fs::File::create(outfile)
-            .unwrap_or_else(|_| panic!("Не удалось открыть файл {:?}", outfile)),
-        img.width() as u32,
-        img.height() as u32,
-    );
-    encoder.set_color(ColorType::RGB);
-    encoder.set_depth(BitDepth::Eight);
-    let mut writer = encoder
-        .write_header()
-        .unwrap_or_else(|_| panic!("Ошибка записи в файл {:?}", outfile));
-    let buf = {
-        let mut buf = Vec::new();
-        for i in 0..img.height() {
-            for j in 0..img.width() {
-                buf.push(img[i][j].0);
-                buf.push(img[i][j].1);
-                buf.push(img[i][j].2);
-            }
-        }
-        buf
-    };
-    writer
-        .write_image_data(&buf)
-        .unwrap_or_else(|_| panic!("Ошибка записи в файл {:?}", outfile));
+    image::save_buffer(
+        outfile,
+        &img.as_slice()
+            .into_iter()
+            .flat_map(|x| vec![x.0, x.1, x.2])
+            .collect::<Vec<_>>()[..],
+        img.width as u32,
+        img.height as u32,
+        image::ColorType::Rgb8,
+    )
+    .unwrap_or_else(|e| panic!("Не удалось сохранить результат.\nПричиниа: '{}'", e))
 }
 
 fn main() {
